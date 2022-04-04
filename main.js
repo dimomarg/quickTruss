@@ -4,6 +4,14 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 const ctx = canvas.getContext('2d');
 
+var scrolling = false;
+
+var mouse = [undefined, undefined];
+
+window.addEventListener('mousemove', function(event){
+    mouse = [event.x, event.y]
+})
+
 class node{
     constructor(coords){
         this.coords = coords;
@@ -43,13 +51,42 @@ viewPort = {
     zoom:100.0, //one length unit is zoom pixels
     
     transform : function(coords){
-        coords[0] *= this.zoom;
-        coords[1] *= this.zoom;
-        coords[0] -= this.pan[0]*this.zoom;
-        coords[1] -= this.pan[1]*this.zoom;
-        coords[0] += canvas.width/2;
-        coords[1] += canvas.height/2;
+        let newcoords = [0,0];
+        newcoords[0] = coords[0] * this.zoom;
+        newcoords[0] -= this.pan[0] * this.zoom;
+        newcoords[0] += canvas.width/2;
+        
+        newcoords[1] = coords[1] * this.zoom;
+        newcoords[1] -= this.pan[1]*this.zoom;
+        newcoords[1] += canvas.height/2;
 
-        return coords;
+        return newcoords;
     }
 }
+
+
+let nodes = [new node([0,0]), new node([1,1])];
+let beams = [new beam([nodes[0], nodes[1]])];
+for (let i = 0; i < nodes.length; ++i){
+    nodes[i].draw();
+}
+for (let i = 0; i < beams.length; ++i){
+    beams[i].draw();
+}
+
+// EVENTS
+canvas.onmousedown = function(event){
+    scrolling = true;
+}
+
+canvas.onmouseup = function(event){
+    scrolling = false;
+    console.log(mouse);
+}
+
+function loop(){
+    requestAnimationFrame(loop);
+    console.log("looping");
+}
+
+loop();
