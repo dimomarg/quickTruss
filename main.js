@@ -56,8 +56,8 @@ class node{
     draw(){
         let drawCoords = viewPort.transform(this.coords);
         ctx.beginPath();
-        ctx.arc(drawCoords[0], drawCoords[1], 20, 0, 2*Math.PI);
-        ctx.stroke();
+        ctx.arc(drawCoords[0], drawCoords[1], 10, 0, 2*Math.PI);
+        ctx.fill();
     }
 }
 
@@ -71,6 +71,7 @@ class beam{
         ctx.beginPath();
         ctx.moveTo(startCoords[0], startCoords[1]);
         ctx.lineTo(endCoords[0], endCoords[1]);
+        ctx.lineWidth = 5;
         ctx.stroke();
     }
 }
@@ -113,7 +114,7 @@ function mainLoop(){
     if (scrolling){
         mouseDelta = mouse.getDelta();
         viewPort.pan[0] -= mouseDelta[0];
-        viewPort.pan[1] -= mouseDelta[1]; //TODO: make mouse class that retrieves mosueDelta.
+        viewPort.pan[1] -= mouseDelta[1];
         
     }
     
