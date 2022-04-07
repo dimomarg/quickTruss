@@ -102,6 +102,7 @@ viewPort = {
        newcoords[1] = coords[1] - canvas.height/2;
        newcoords[1] += this.pan[1];
        newcoords[1] /= this.zoom;
+   }
 }
 
 //TEST CODE
