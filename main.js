@@ -91,7 +91,17 @@ viewPort = {
         newcoords[1] += canvas.height/2;
 
         return newcoords;
-    }
+    },
+    
+   reverseTransform : function(coords){
+       let newcoords = [0,0];
+       newcoords[0] = coords[0] - canvas.width/2;
+       newcoords[0] += this.pan[0];
+       newcoords[0] /= this.zoom;
+       
+       newcoords[1] = coords[1] - canvas.height/2;
+       newcoords[1] += this.pan[1];
+       newcoords[1] /= this.zoom;
 }
 
 //TEST CODE
