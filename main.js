@@ -5,7 +5,71 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 const ctx = canvas.getContext('2d');
 
-var scrolling = false;
+let scrolling = false;
+let movingNodes = false;
+
+// EVENTS AND LISTENERS
+canvas.addEventListener('mousemove', function(event){
+    mouse.update(event);
+})
+
+canvas.addEventListener('wheel', function(event){
+    console.log(event);
+    event.preventDefault();
+    console.log(event.deltaY);
+    viewPort.zoom += event.deltaY/10;
+})
+
+canvas.addEventListener('keydown', function(event){
+    switch (event.code){
+        case "Space":
+            scrolling = true;
+            break;
+        default:
+            console.log(event.code);
+    }
+})
+
+canvas.addEventListener('keyup', function(event){
+    switch (event.code){
+        case "Space":
+            console.log("spacebar");
+            scrolling = false;
+            break;
+        default:
+            console.log(event.code);
+    }
+})
+
+
+canvas.onmousedown = function(){
+    newNode = new node(viewPort.pixelsToUnits(mouse.coords));
+    tempNodes.push(newNode);
+    extrudeFrom = nodes.getAtCoords(mouse.coords);
+    
+    if (extrudeFrom){
+        tempBeams.push(new beam([newNode, extrudeFrom]));
+    }
+    else if (extrudeFrom = beams.getAtCoords(mouse.coords)){
+        tempBeams.push(new beam([newNode, extrudeFrom.nodes[0]]));
+        tempBeams.push(new beam([newNode, extrudeFrom.nodes[1]]));
+    }  
+    beams.getAtCoords(mouse.coords);
+    movingNodes = true;
+}
+
+canvas.onmouseup = function(){
+    movingNodes = false;
+    let length = tempNodes.length;
+    while (tempNodes.length > 0){
+        nodes.push(tempNodes.pop())
+    }
+    while (tempBeams.length > 0){
+        beams.push(tempBeams.pop())
+    }
+}
+
+//CLASSES
 
 mouse = { //mouse handler class
     coords : [0,0],
@@ -30,16 +94,6 @@ mouse = { //mouse handler class
     }
 }
 
-canvas.addEventListener('mousemove', function(event){
-    mouse.update(event);
-})
-
-canvas.addEventListener('wheel', function(event){
-    console.log(event);
-    event.preventDefault();
-    console.log(event.deltaY);
-    viewPort.zoom += event.deltaY/10;
-})
 
 class node{
     constructor(coords){
@@ -71,8 +125,7 @@ class node{
         distanceVector = [distanceVector[0] - coords[0], distanceVector[1]- coords[1]]
         let distanceSquared = distanceVector[0]*distanceVector[0]
                             + distanceVector[1]*distanceVector[1];
-        console.log(distanceVector, distanceSquared);
-        return distanceSquared<100;
+        return distanceSquared < 100;
     }
 }
 
@@ -87,12 +140,14 @@ class beam{
         ctx.moveTo(startCoords[0], startCoords[1]);
         ctx.lineTo(endCoords[0], endCoords[1]);
         ctx.lineWidth = 5;
+        
         if (this.isTouchingPoint(mouse.coords)){
             ctx.strokeStyle = "#FF0000"
         }
             else{
                 ctx.strokeStyle = "#000000"
             }
+
         ctx.stroke();
     }
     
@@ -116,8 +171,8 @@ class beam{
         }
         
         else{
-            let temp = Math.abs((ab[0] * ab[1] + ac[0] * ac[1]));
-            return (Math.abs(ab[0] * ac[1] - ac[0] * ab[1]) / temp < 0.18);
+            let temp = Math.abs((ab[0] * ab[0] + ab[1] * ab[1]));
+            return (Math.abs(ab[0] * ac[1] - ac[0] * ab[1]) / temp < 0.08);
         }
 
     }
@@ -154,48 +209,72 @@ viewPort = {
    }
 }
 
-//TEST CODE
+//FUNCTIONS
+
+function getAtCoords(coords){
+    length = this.length;
+    for (let i = 0; i<this.length; i++){
+        if (this[i].isTouchingPoint(coords)){
+            console.log("yes");
+            return this[i];
+        }
+    }
+    return false;
+}
+
+function setPosition(coords){
+    length = this.length;
+    for (let i = 0; i<this.length; i++){
+        this[i].coords = coords;
+    }
+}
+
+//INITIALIZATION
 
 let nodes = [new node([0,0]), new node([1,1])];
+nodes.getAtCoords = getAtCoords;
+
 let beams = [new beam([nodes[0], nodes[1]])];
+beams.getAtCoords = getAtCoords;
 
-for (let i = 0; i < nodes.length; ++i){
-    nodes[i].draw();
-}
+let tempNodes = [];
+tempNodes.setPosition = setPosition;
 
-for (let i = 0; i < beams.length; ++i){
-    beams[i].draw();
-}
+let tempBeams = [];
+
+
+//MAIN LOOP
 
 function mainLoop(){
     requestAnimationFrame(mainLoop);
     let mouseDelta = [0,0];
 
+    mouseDelta = mouse.getDelta();
+
     if (scrolling){
-        mouseDelta = mouse.getDelta();
         viewPort.pan[0] -= mouseDelta[0];
         viewPort.pan[1] -= mouseDelta[1];
         
     }
+
+    if (movingNodes){
+        tempNodes.setPosition(viewPort.pixelsToUnits(mouse.coords))
+    }
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
+    
+    for (i = 0; i < beams.length; ++i){
+        beams[i].draw();
+    }
     for (let i = 0; i < nodes.length; ++i){ //TODO: draw function.
         nodes[i].draw();
     }
-    for (let i = 0; i < beams.length; ++i){
-        beams[i].draw();
+    for (i = 0; i < tempBeams.length; ++i){
+        tempBeams[i].draw();
+    }
+    for (i = 0; i < tempNodes.length; ++i){ //TODO: draw function.
+        tempNodes[i].draw();
     }
 }
 
 mainLoop();
-
-// EVENTS
-canvas.onmousedown = function(){
-    scrolling = true;
-}
-
-canvas.onmouseup = function(){
-    scrolling = false;
-    console.log(beams[0].isTouchingPoint(mouse.coords));
-}
