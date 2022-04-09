@@ -9,6 +9,7 @@ let scrolling = false;
 let movingNodes = false;
 
 // EVENTS AND LISTENERS
+
 canvas.addEventListener('mousemove', function(event){
     mouse.update(event);
 })
@@ -21,9 +22,22 @@ canvas.addEventListener('wheel', function(event){
 })
 
 canvas.addEventListener('keydown', function(event){
+    if (event.code[0] == "K"){ //if key pressed has code beginnging with K,therefore Key
+        event.preventDefault();
+    }
     switch (event.code){
         case "Space":
             scrolling = true;
+            break;
+        case "KeyD":
+            let toBeDeleted;
+
+            if (toBeDeleted = nodes.getAtCoords(mouse.coords)){
+                toBeDeleted.deleteFrom(nodes);
+            }
+            else if (toBeDeleted = beams.getAtCoords(mouse.coords)){
+                toBeDeleted.deleteFrom(beams);
+            }
             break;
         default:
             console.log(event.code);
@@ -42,18 +56,18 @@ canvas.addEventListener('keyup', function(event){
 })
 
 
-canvas.onmousedown = function(){
+canvas.onmousedown = function(){ //TODO: package node creation as its own function.
     newNode = new node(viewPort.pixelsToUnits(mouse.coords));
     tempNodes.push(newNode);
     extrudeFrom = nodes.getAtCoords(mouse.coords);
-    
+
     if (extrudeFrom){
         tempBeams.push(new beam([newNode, extrudeFrom]));
     }
     else if (extrudeFrom = beams.getAtCoords(mouse.coords)){
         tempBeams.push(new beam([newNode, extrudeFrom.nodes[0]]));
         tempBeams.push(new beam([newNode, extrudeFrom.nodes[1]]));
-    }  
+    }
     beams.getAtCoords(mouse.coords);
     movingNodes = true;
 }
@@ -71,13 +85,13 @@ canvas.onmouseup = function(){
 
 //CLASSES
 
-mouse = { //mouse handler class
+mouse = { //mouse handler object
     coords : [0,0],
     prevCoords : [0,0],
     hasMoved : false,
-    
+
     update : function(event){
-        this.prevCoords = [this.coords[0], this.coords[1]]; 
+        this.prevCoords = [this.coords[0], this.coords[1]];
         this.coords = [event.x, event.y];
         this.hasMoved = true;
     },
@@ -99,6 +113,8 @@ class node{
     constructor(coords){
         this.coords = coords;
     }
+
+    beams = [];
 
     x(){
         return this.coords[0];
@@ -127,11 +143,22 @@ class node{
                             + distanceVector[1]*distanceVector[1];
         return distanceSquared < 100;
     }
+
+    deleteFrom(nodeArray = nodes, beamArray = beams){
+        let index = nodeArray.indexOf(this);
+        nodeArray.splice(index, 1);
+
+        while(this.beams.length!=0){
+            this.beams[0].deleteFrom(beamArray);
+        }
+    }
 }
 
 class beam{
     constructor(nodes){
         this.nodes = nodes;
+        nodes[0].beams.push(this);
+        nodes[1].beams.push(this);
     }
     draw(){
         let startCoords = viewPort.unitsToPixels(this.nodes[0].coords);
@@ -140,7 +167,7 @@ class beam{
         ctx.moveTo(startCoords[0], startCoords[1]);
         ctx.lineTo(endCoords[0], endCoords[1]);
         ctx.lineWidth = 5;
-        
+
         if (this.isTouchingPoint(mouse.coords)){
             ctx.strokeStyle = "#FF0000"
         }
@@ -150,7 +177,7 @@ class beam{
 
         ctx.stroke();
     }
-    
+
     isTouchingPoint(c){ //caution: returns infinity if point is closest to end points
         let a = viewPort.unitsToPixels(this.nodes[0].coords);
         let b = viewPort.unitsToPixels(this.nodes[1].coords);
@@ -158,53 +185,63 @@ class beam{
         let ab = [b[0] - a[0], b[1]-a[1]]; //vectors ab, ac and bc
         let bc = [c[0] - b[0], c[1]-b[1]];
         let ac = [c[0] - a[0], c[1]-a[1]];
-        
+
         let ab_bc = ab[0] * bc[0] + ab[1] * bc[1]; //dot products
         let ab_ac = ab[0] * ac[0] + ab[1] * ac[1];
 
         if (ab_bc >0){
             return false;
         }
-        
+
         else if(ab_ac <0){
             return false;
         }
-        
+
         else{
             let temp = Math.abs((ab[0] * ab[0] + ab[1] * ab[1]));
             return (Math.abs(ab[0] * ac[1] - ac[0] * ab[1]) / temp < 0.08);
         }
 
     }
+
+    deleteFrom(beamArray = beams){
+        let index = beamArray.indexOf(this);
+        beamArray.splice(index, 1);
+
+        for (let i = 0; i < 2; ++i){
+            index = this.nodes[i].beams.indexOf(this);
+            this.nodes[i].beams.splice(index, 1);
+        }
+    }
 }
 
 viewPort = {
     pan:[0, 0], //center of the viewPort in length units.
     zoom:100.0, //one length unit is zoom pixels
-    
+
     unitsToPixels : function(coords){
         let newcoords = [0,0];
         newcoords[0] = coords[0] * this.zoom;
         newcoords[0] -= this.pan[0]// * this.zoom;
         newcoords[0] += canvas.width/2;
-        
+
         newcoords[1] = coords[1] * this.zoom;
         newcoords[1] -= this.pan[1]// * this.zoom;
         newcoords[1] += canvas.height/2;
 
         return newcoords;
     },
-    
+
    pixelsToUnits : function(coords){
        let newcoords = [0,0];
        newcoords[0] = coords[0] - canvas.width/2;
        newcoords[0] += this.pan[0];
        newcoords[0] /= this.zoom;
-       
+
        newcoords[1] = coords[1] - canvas.height/2;
        newcoords[1] += this.pan[1];
        newcoords[1] /= this.zoom;
-       
+
        return newcoords;
    }
 }
@@ -254,15 +291,15 @@ function mainLoop(){
     if (scrolling){
         viewPort.pan[0] -= mouseDelta[0];
         viewPort.pan[1] -= mouseDelta[1];
-        
+
     }
 
     if (movingNodes){
         tempNodes.setPosition(viewPort.pixelsToUnits(mouse.coords))
     }
-    
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
     for (i = 0; i < beams.length; ++i){
         beams[i].draw();
     }
