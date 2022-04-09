@@ -22,7 +22,7 @@ canvas.addEventListener('wheel', function(event){
 })
 
 canvas.addEventListener('keydown', function(event){
-    if (event.code[0] == "K"){ //if key pressed has code beginnging with K,therefore Key
+    if (event.code[0] == "K"){ //if key pressed has code beginning with K,therefore Key
         event.preventDefault();
     }
     switch (event.code){
@@ -131,7 +131,7 @@ class node{
             ctx.fillStyle = "#0000ff";
         }
         else{
-            ctx.fillStyle = "#000000"
+            ctx.fillStyle = "#000000";
         }
         ctx.fill();
     }
@@ -150,6 +150,12 @@ class node{
 
         while(this.beams.length!=0){
             this.beams[0].deleteFrom(beamArray);
+        }
+    }
+
+    transferBeamsTo(target){
+        while (this.beams.length>0){
+            this.beams[0].replaceConnection(this, target)
         }
     }
 }
@@ -213,6 +219,19 @@ class beam{
             this.nodes[i].beams.splice(index, 1);
         }
     }
+
+    replaceConnection(replaced, replacement){
+        if (this.nodes[0] == replaced && replacement != this.nodes[1]){
+            this.nodes[0] = replacement;
+        }
+        else if (this.nodes[1] == replaced && replacement != this.nodes[0]){
+            this.nodes[1] = replacement;
+        }
+        let index = replaced.beams.indexOf(this);
+        replaced.beams.splice(index, 1);
+        replacement.beams.push(this);
+        return 0;
+    }
 }
 
 viewPort = {
@@ -233,16 +252,16 @@ viewPort = {
     },
 
    pixelsToUnits : function(coords){
-       let newcoords = [0,0];
-       newcoords[0] = coords[0] - canvas.width/2;
-       newcoords[0] += this.pan[0];
-       newcoords[0] /= this.zoom;
+        let newcoords = [0,0];
+        newcoords[0] = coords[0] - canvas.width/2;
+        newcoords[0] += this.pan[0];
+        newcoords[0] /= this.zoom;
 
-       newcoords[1] = coords[1] - canvas.height/2;
-       newcoords[1] += this.pan[1];
-       newcoords[1] /= this.zoom;
+        newcoords[1] = coords[1] - canvas.height/2;
+        newcoords[1] += this.pan[1];
+        newcoords[1] /= this.zoom;
 
-       return newcoords;
+        return newcoords;
    }
 }
 
@@ -309,7 +328,7 @@ function mainLoop(){
     for (i = 0; i < tempBeams.length; ++i){
         tempBeams[i].draw();
     }
-    for (i = 0; i < tempNodes.length; ++i){ //TODO: draw function.
+    for (i = 0; i < tempNodes.length; ++i){
         tempNodes[i].draw();
     }
 }
