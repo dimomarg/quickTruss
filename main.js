@@ -22,25 +22,53 @@ canvas.addEventListener('wheel', function(event){
 })
 
 canvas.addEventListener('keydown', function(event){
+    let pressedNode = nodes.getAtCoords(mouse.coords);
     if (event.code[0] == "K"){ //if key pressed has code beginning with K,therefore Key
         event.preventDefault();
     }
     switch (event.code){
-        case "Space":
+
+        case "Space": //Scroll
             scrolling = true;
             break;
+        case "Delete": //Delete node
+        case "Backspace":
         case "KeyD":
-            let toBeDeleted;
-
-            if (toBeDeleted = nodes.getAtCoords(mouse.coords)){
-                toBeDeleted.deleteFrom(nodes);
+            if (pressedNode){
+                pressedNode.delete();
             }
-            else if (toBeDeleted = beams.getAtCoords(mouse.coords)){
-                toBeDeleted.deleteFrom(beams);
+            else if (pressedNode = beams.getAtCoords(mouse.coords)){
+                pressedNode.delete();
             }
             break;
+
+        case "KeyM": //Move node
+            if (pressedNode && !movingNodes){
+                pressedNode.changeParent(tempNodes);
+                movingNodes = true;
+            }
+            break;
+            
+        case "KeyS": //Support node
+            if (pressedNode){
+                if (pressedNode.support < 3){
+                    pressedNode.support++;
+                }
+                else{
+                    pressedNode.support = 0;
+                }
+                console.log(pressedNode.support);
+            }
+            break;
+        
+        case "KeyF": //Edit force
+
+            break;
+
+
         default:
             console.log(event.code);
+        
     }
 })
 
@@ -50,6 +78,14 @@ canvas.addEventListener('keyup', function(event){
             console.log("spacebar");
             scrolling = false;
             break;
+        
+        case "KeyM":
+            while (tempNodes.length > 0){
+                tempNodes[0].changeParent(nodes);
+            }
+            movingNodes = false;
+            break;
+
         default:
             console.log(event.code);
     }
@@ -57,29 +93,34 @@ canvas.addEventListener('keyup', function(event){
 
 
 canvas.onmousedown = function(){ //TODO: package node creation as its own function.
-    newNode = new node(viewPort.pixelsToUnits(mouse.coords));
+    newNode = new node(viewPort.pixelsToUnits(mouse.coords), tempNodes);
     tempNodes.push(newNode);
     extrudeFrom = nodes.getAtCoords(mouse.coords);
 
     if (extrudeFrom){
-        tempBeams.push(new beam([newNode, extrudeFrom]));
+        tempBeams.push(new beam([newNode, extrudeFrom], tempBeams));
     }
     else if (extrudeFrom = beams.getAtCoords(mouse.coords)){
-        tempBeams.push(new beam([newNode, extrudeFrom.nodes[0]]));
-        tempBeams.push(new beam([newNode, extrudeFrom.nodes[1]]));
+        tempBeams.push(new beam([newNode, extrudeFrom.nodes[0]],tempBeams));
+        tempBeams.push(new beam([newNode, extrudeFrom.nodes[1]],tempBeams));
     }
-    beams.getAtCoords(mouse.coords);
     movingNodes = true;
 }
 
 canvas.onmouseup = function(){
+    let mergeNode;
     movingNodes = false;
-    let length = tempNodes.length;
     while (tempNodes.length > 0){
-        nodes.push(tempNodes.pop())
+        if (mergeNode = nodes.getAtCoords(mouse.coords)){
+            tempNodes[0].transferBeamsTo(mergeNode);
+            tempNodes.splice(0,1);
+        }
+        else{
+            tempNodes[0].changeParent(nodes);
+        }
     }
     while (tempBeams.length > 0){
-        beams.push(tempBeams.pop())
+        tempBeams[0].changeParent(beams);
     }
 }
 
@@ -110,11 +151,14 @@ mouse = { //mouse handler object
 
 
 class node{
-    constructor(coords){
+    constructor(coords, parentArray = undefined){
         this.coords = coords;
+        this.parentArray = parentArray;
     }
 
     beams = [];
+    force = [0,0];
+    support = 0;
 
     x(){
         return this.coords[0];
@@ -134,6 +178,16 @@ class node{
             ctx.fillStyle = "#000000";
         }
         ctx.fill();
+
+        if (this.force != [0,0]){
+            console.log("drawing force")
+            let gizmoCoords = this.getForceGizmo();
+            ctx.beginPath();
+            ctx.moveTo(drawCoords[0], drawCoords[1]);
+            ctx.lineTo(gizmoCoords[0], gizmoCoords[1]);
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
     }
 
     isTouchingPoint(coords){
@@ -144,12 +198,35 @@ class node{
         return distanceSquared < 100;
     }
 
-    deleteFrom(nodeArray = nodes, beamArray = beams){
-        let index = nodeArray.indexOf(this);
-        nodeArray.splice(index, 1);
+    getForceGizmo(){ //returns location of tip of force arrow
+        let gizmoCoords = viewPort.unitsToPixels(this.coords);
+        gizmoCoords[0] += this.force[0];
+        gizmoCoords[1] += this.force[1];
+        return gizmoCoords;
 
-        while(this.beams.length!=0){
-            this.beams[0].deleteFrom(beamArray);
+    }
+
+    setForcefromGizmo(coords){ //sets force from location of tip of force arrow
+        let NodeCoords = viewPortunitsToPixels(this.coords);
+        this.force[0] = coords[0] - NodeCoords[0];
+        this.force[1] = coords[1] - NodeCoords[1];
+    }
+
+    changeParent(newParent){
+        let index = this.parentArray.indexOf(this);
+        this.parentArray.splice(index,1);
+        
+        newParent.push(this);
+        this.parentArray = newParent;
+    }
+
+    delete(){
+        console.log("deleting node from", this.parentArray)
+        let index = this.parentArray.indexOf(this);
+        this.parentArray.splice(index, 1);
+
+        while(this.beams.length > 0){
+            this.beams[0].delete();
         }
     }
 
@@ -157,15 +234,34 @@ class node{
         while (this.beams.length>0){
             this.beams[0].replaceConnection(this, target)
         }
+        target.cleanBadBeams();
+    }
+
+    cleanBadBeams(){ //cleans duplicate and self connecting beams
+        let i,j;
+        console.log(this.beams.length);
+        for (i = this.beams.length - 1; i >= 0; --i){
+            for (j = i-1; j >= 0; --j){
+                console.log(i,j);
+                if (this.beams[i].isIdentical(this.beams[j])){
+                    this.beams[j].delete();
+                    --i;
+                    //there is no need to check for self connecting beams
+                    //beacuse beam.delete() inadvertantly takes care of them.
+                }
+            }
+        }
     }
 }
 
 class beam{
-    constructor(nodes){
+    constructor(nodes, parentArray = undefined){
         this.nodes = nodes;
         nodes[0].beams.push(this);
         nodes[1].beams.push(this);
+        this.parentArray = parentArray;
     }
+
     draw(){
         let startCoords = viewPort.unitsToPixels(this.nodes[0].coords);
         let endCoords = viewPort.unitsToPixels(this.nodes[1].coords);
@@ -210,9 +306,17 @@ class beam{
 
     }
 
-    deleteFrom(beamArray = beams){
-        let index = beamArray.indexOf(this);
-        beamArray.splice(index, 1);
+    changeParent(newParent){
+        let index = this.parentArray.indexOf(this);
+        this.parentArray.splice(index,1);
+        
+        newParent.push(this);
+        this.parentArray = newParent;
+    }
+
+    delete(){
+        let index = this.parentArray.indexOf(this);
+        this.parentArray.splice(index, 1);
 
         for (let i = 0; i < 2; ++i){
             index = this.nodes[i].beams.indexOf(this);
@@ -221,16 +325,27 @@ class beam{
     }
 
     replaceConnection(replaced, replacement){
-        if (this.nodes[0] == replaced && replacement != this.nodes[1]){
+        if (this.nodes[0] == replaced){
             this.nodes[0] = replacement;
         }
-        else if (this.nodes[1] == replaced && replacement != this.nodes[0]){
+        else{
             this.nodes[1] = replacement;
         }
         let index = replaced.beams.indexOf(this);
         replaced.beams.splice(index, 1);
         replacement.beams.push(this);
         return 0;
+    }
+
+    isIdentical(targetBeam){
+        if (this.nodes[0] == targetBeam.nodes[0] && this.nodes[1] == targetBeam.nodes[1]){
+            return true;
+        }
+        else if (this.nodes[0] == targetBeam.nodes[1] && this.nodes[1] == targetBeam.nodes[0]){
+            return true;
+        }
+        console.log("not identical")
+        return false;
     }
 }
 
@@ -271,14 +386,13 @@ function getAtCoords(coords){
     length = this.length;
     for (let i = 0; i<this.length; i++){
         if (this[i].isTouchingPoint(coords)){
-            console.log("yes");
             return this[i];
         }
     }
     return false;
 }
 
-function setPosition(coords){
+function setPosition(coords){ //TODO: probably refactor this into node class
     length = this.length;
     for (let i = 0; i<this.length; i++){
         this[i].coords = coords;
@@ -287,10 +401,10 @@ function setPosition(coords){
 
 //INITIALIZATION
 
-let nodes = [new node([0,0]), new node([1,1])];
+let nodes = [];
 nodes.getAtCoords = getAtCoords;
 
-let beams = [new beam([nodes[0], nodes[1]])];
+let beams = [];
 beams.getAtCoords = getAtCoords;
 
 let tempNodes = [];
