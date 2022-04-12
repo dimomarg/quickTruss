@@ -7,7 +7,7 @@ const ctx = canvas.getContext('2d');
 
 let scrolling = false;
 let movingNodes = false;
-
+let movingForce = false;
 // EVENTS AND LISTENERS
 
 canvas.addEventListener('mousemove', function(event){
@@ -15,9 +15,7 @@ canvas.addEventListener('mousemove', function(event){
 })
 
 canvas.addEventListener('wheel', function(event){
-    console.log(event);
     event.preventDefault();
-    console.log(event.deltaY);
     viewPort.zoom += event.deltaY/10;
 })
 
@@ -57,12 +55,11 @@ canvas.addEventListener('keydown', function(event){
                 else{
                     pressedNode.support = 0;
                 }
-                console.log(pressedNode.support);
             }
             break;
         
         case "KeyF": //Edit force
-
+            movingForce = nodes.getForcesAtCoords(mouse.coords);
             break;
 
 
@@ -75,7 +72,6 @@ canvas.addEventListener('keydown', function(event){
 canvas.addEventListener('keyup', function(event){
     switch (event.code){
         case "Space":
-            console.log("spacebar");
             scrolling = false;
             break;
         
@@ -85,9 +81,10 @@ canvas.addEventListener('keyup', function(event){
             }
             movingNodes = false;
             break;
-
-        default:
-            console.log(event.code);
+        
+        case "KeyF":
+            movingForce = false;
+            break;
     }
 })
 
@@ -179,13 +176,13 @@ class node{
         }
         ctx.fill();
 
-        if (this.force != [0,0]){
-            console.log("drawing force")
+        if (this.force[0] != 0 || this.force[1] != 0){
             let gizmoCoords = this.getForceGizmo();
             ctx.beginPath();
             ctx.moveTo(drawCoords[0], drawCoords[1]);
             ctx.lineTo(gizmoCoords[0], gizmoCoords[1]);
             ctx.lineWidth = 3;
+            ctx.strokeStyle = "#FF0000"
             ctx.stroke();
         }
     }
@@ -197,20 +194,26 @@ class node{
                             + distanceVector[1]*distanceVector[1];
         return distanceSquared < 100;
     }
+    
+    fGizmoTouchingPoint(coords){
+        let x = coords[0] - this.force[0];
+        let y = coords[1] - this.force[1];
+        return this.isTouchingPoint([x,y]);
+    }
 
     getForceGizmo(){ //returns location of tip of force arrow
         let gizmoCoords = viewPort.unitsToPixels(this.coords);
         gizmoCoords[0] += this.force[0];
         gizmoCoords[1] += this.force[1];
         return gizmoCoords;
-
     }
 
-    setForcefromGizmo(coords){ //sets force from location of tip of force arrow
-        let NodeCoords = viewPortunitsToPixels(this.coords);
+    setForceFromGizmo(coords){ //sets force from location of tip of force arrow
+        let NodeCoords = viewPort.unitsToPixels(this.coords);
         this.force[0] = coords[0] - NodeCoords[0];
         this.force[1] = coords[1] - NodeCoords[1];
     }
+
 
     changeParent(newParent){
         let index = this.parentArray.indexOf(this);
@@ -221,7 +224,6 @@ class node{
     }
 
     delete(){
-        console.log("deleting node from", this.parentArray)
         let index = this.parentArray.indexOf(this);
         this.parentArray.splice(index, 1);
 
@@ -239,10 +241,8 @@ class node{
 
     cleanBadBeams(){ //cleans duplicate and self connecting beams
         let i,j;
-        console.log(this.beams.length);
         for (i = this.beams.length - 1; i >= 0; --i){
             for (j = i-1; j >= 0; --j){
-                console.log(i,j);
                 if (this.beams[i].isIdentical(this.beams[j])){
                     this.beams[j].delete();
                     --i;
@@ -344,7 +344,6 @@ class beam{
         else if (this.nodes[0] == targetBeam.nodes[1] && this.nodes[1] == targetBeam.nodes[0]){
             return true;
         }
-        console.log("not identical")
         return false;
     }
 }
@@ -392,6 +391,16 @@ function getAtCoords(coords){
     return false;
 }
 
+function getForcesAtCoords(coords){
+    length = this.length;
+    for (let i = 0; i<this.length; i++){
+        if (this[i].fGizmoTouchingPoint(coords)){
+            return this[i];
+        }
+    }
+    return false;
+}
+
 function setPosition(coords){ //TODO: probably refactor this into node class
     length = this.length;
     for (let i = 0; i<this.length; i++){
@@ -399,10 +408,42 @@ function setPosition(coords){ //TODO: probably refactor this into node class
     }
 }
 
+//SOLVER FUNCTIONS
+function solve(nodeArray = nodes, beamArray = beams){
+    let i,j,k;
+    let forceMatrix = [];
+    let supports
+    console.log(forceMatrix);
+    for (i = 0; i < nodeArray.length; ++i){    
+        for (j = 0; j<2; ++j){
+            forceMatrix.push([]);
+            for (k = 0; k < beamArray.length; ++k){
+                forceMatrix[2*i+j].push(nodeArray[i].beams.indexOf(beamArray[k]));
+            }
+            for (k = 0; k < nodeArray.length; ++k){
+                switch (nodeArray[k].support){
+                    case 1:
+                        forceMatrix[2*i+j].push((i==k)*(j==0));
+                        break;
+                    case 2:
+                        forceMatrix[2*i+j].push((i==k)*(j==1));
+                        break;
+                    case 3:
+                        forceMatrix[2*i+j].push((i==k)*(j==0));
+                        forceMatrix[2*i+j].push((i==k)*(j==1));
+                        break;
+                }
+            }
+        }
+    }
+    return forceMatrix;
+}
+
 //INITIALIZATION
 
 let nodes = [];
 nodes.getAtCoords = getAtCoords;
+nodes.getForcesAtCoords = getForcesAtCoords;
 
 let beams = [];
 beams.getAtCoords = getAtCoords;
@@ -429,6 +470,10 @@ function mainLoop(){
 
     if (movingNodes){
         tempNodes.setPosition(viewPort.pixelsToUnits(mouse.coords))
+    }
+
+    if (movingForce){
+        movingForce.setForceFromGizmo(mouse.coords);
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
