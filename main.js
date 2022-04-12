@@ -5,9 +5,23 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 const ctx = canvas.getContext('2d');
 
+let supportX;
+let supportY;
+let supportXY;
+window.onload = function(){
+    supportX = document.getElementById("xSup");
+    supportY = document.getElementById("ySup");
+    supportXY = document.getElementById("xySup");
+}
+
 let scrolling = false;
 let movingNodes = false;
 let movingForce = false;
+
+let solution = {
+    isValid : false
+}
+
 // EVENTS AND LISTENERS
 
 canvas.addEventListener('mousemove', function(event){
@@ -61,11 +75,10 @@ canvas.addEventListener('keydown', function(event){
         case "KeyF": //Edit force
             movingForce = nodes.getForcesAtCoords(mouse.coords);
             break;
-
-
-        default:
-            console.log(event.code);
         
+        case "Enter":
+            solution = new Solution()
+            break;
     }
 })
 
@@ -86,6 +99,8 @@ canvas.addEventListener('keyup', function(event){
             movingForce = false;
             break;
     }
+    solution = new Solution();
+
 })
 
 
@@ -119,6 +134,8 @@ canvas.onmouseup = function(){
     while (tempBeams.length > 0){
         tempBeams[0].changeParent(beams);
     }
+    solution = new Solution();
+
 }
 
 //CLASSES
@@ -148,7 +165,7 @@ mouse = { //mouse handler object
 
 
 class node{
-    constructor(coords, parentArray = undefined){
+    constructor(coords, parentArray = nodes){
         this.coords = coords;
         this.parentArray = parentArray;
     }
@@ -172,11 +189,32 @@ class node{
             ctx.fillStyle = "#0000ff";
         }
         else{
-            ctx.fillStyle = "#000000";
+            ctx.fillStyle = "#ffffff";
         }
         ctx.fill();
 
-        if (this.force[0] != 0 || this.force[1] != 0){
+        if (this.support){
+            let iconCoords = viewPort.unitsToPixels(this.coords);
+            let supportIcon;
+            switch (this.support){
+                case 1:
+                    supportIcon = supportX;
+                    iconCoords[0] -= 30
+                    iconCoords[1] -= 15
+                    break;
+                case 2:
+                    supportIcon = supportY;
+                    iconCoords[0] -= 15
+                    break;
+                case 3:
+                    supportIcon = supportXY;
+                    iconCoords[0] -= 15
+                    break;
+            }
+            ctx.drawImage(supportIcon, iconCoords[0], iconCoords[1], 30, 30)
+        }
+
+        if (this.force[0] != 0 || this.force[1] != 0){ //draw force vector
             let gizmoCoords = this.getForceGizmo();
             ctx.beginPath();
             ctx.moveTo(drawCoords[0], drawCoords[1]);
@@ -255,27 +293,42 @@ class node{
 }
 
 class beam{
-    constructor(nodes, parentArray = undefined){
+    constructor(nodes, parentArray = beams){
         this.nodes = nodes;
         nodes[0].beams.push(this);
         nodes[1].beams.push(this);
         this.parentArray = parentArray;
     }
 
-    draw(){
+    draw(stresses = solution){
         let startCoords = viewPort.unitsToPixels(this.nodes[0].coords);
         let endCoords = viewPort.unitsToPixels(this.nodes[1].coords);
+        let index = 0;
         ctx.beginPath();
         ctx.moveTo(startCoords[0], startCoords[1]);
         ctx.lineTo(endCoords[0], endCoords[1]);
         ctx.lineWidth = 5;
 
-        if (this.isTouchingPoint(mouse.coords)){
+        if (solution.isValid){
+            index = this.parentArray.indexOf(this);
+            if (stresses.array[index]>0){
+                ctx.strokeStyle = "#0000AA"
+            }
+            else if (stresses.array[index]<0){
+                ctx.strokeStyle = "#00AA00"
+            }
+            else{
+                ctx.strokeStyle = "#ffffff"
+            }
+        }
+
+        else if (this.isTouchingPoint(mouse.coords)){
             ctx.strokeStyle = "#FF0000"
         }
-            else{
-                ctx.strokeStyle = "#000000"
-            }
+        
+        else{
+            ctx.strokeStyle = "#ffffff"
+        }
 
         ctx.stroke();
     }
@@ -346,6 +399,76 @@ class beam{
         }
         return false;
     }
+
+    getVector(node = this.nodes[0]){
+        let mult = 1;
+        let index = this.nodes.indexOf(node);
+        if (index == -1){
+            return NaN;
+        }
+        
+        if (index == 1){
+            mult = -1;
+        }
+        return [(this.nodes[1].coords[0] - this.nodes[0].coords[0])*mult,
+        (this.nodes[1].coords[1] - this.nodes[0].coords[1])*mult];
+    }
+
+    getSin(node = this.nodes[0]){
+        let vector = this.getVector(node);
+        return vector [1]/Math.sqrt(vector[0]*vector[0]+vector[1]*vector[1]);
+    }
+
+    getCos(node = this.nodes[0]){
+        let vector = this.getVector(node);
+        return vector [0]/Math.sqrt(vector[0]*vector[0]+vector[1]*vector[1]);
+    }
+}
+
+class Solution{
+    constructor(nodeArray = nodes, beamArray = beams){
+        let i,j,k;
+        let beamMatrix = [];
+        let forceMatrix = [];
+        let toBePushed = 0;
+        console.log(beamMatrix);
+        for (i = 0; i < nodeArray.length; ++i){    
+            for (j = 0; j<2; ++j){
+                beamMatrix.push([]);
+                for (k = 0; k < beamArray.length; ++k){
+                    if (j){
+                        toBePushed = (beamArray[k].getSin(nodeArray[i]));
+                    }
+                    else{
+                        toBePushed = (beamArray[k].getCos(nodeArray[i]));
+                    }
+                    if (isNaN(toBePushed)){
+                        toBePushed = 0;
+                    }
+                    beamMatrix[2*i+j].push(toBePushed);
+                }
+                for (k = 0; k < nodeArray.length; ++k){
+                    switch (nodeArray[k].support){
+                        case 1:
+                            beamMatrix[2*i+j].push((i==k)*(j==0));
+                            break;
+                        case 2:
+                            beamMatrix[2*i+j].push((i==k)*(j==1));
+                            break;
+                        case 3:
+                            beamMatrix[2*i+j].push((i==k)*(j==0));
+                            beamMatrix[2*i+j].push((i==k)*(j==1));
+                            break;
+                    }
+                }
+                forceMatrix.push([nodeArray[i].force[j]])
+            }
+        }
+        console.log(beamMatrix);
+        console.log(forceMatrix);
+        this.array = (math.multiply(math.inv(beamMatrix),forceMatrix));
+        this.isValid = true;
+    }
 }
 
 viewPort = {
@@ -407,38 +530,6 @@ function setPosition(coords){ //TODO: probably refactor this into node class
         this[i].coords = coords;
     }
 }
-
-//SOLVER FUNCTIONS
-function solve(nodeArray = nodes, beamArray = beams){
-    let i,j,k;
-    let forceMatrix = [];
-    let supports
-    console.log(forceMatrix);
-    for (i = 0; i < nodeArray.length; ++i){    
-        for (j = 0; j<2; ++j){
-            forceMatrix.push([]);
-            for (k = 0; k < beamArray.length; ++k){
-                forceMatrix[2*i+j].push(nodeArray[i].beams.indexOf(beamArray[k]));
-            }
-            for (k = 0; k < nodeArray.length; ++k){
-                switch (nodeArray[k].support){
-                    case 1:
-                        forceMatrix[2*i+j].push((i==k)*(j==0));
-                        break;
-                    case 2:
-                        forceMatrix[2*i+j].push((i==k)*(j==1));
-                        break;
-                    case 3:
-                        forceMatrix[2*i+j].push((i==k)*(j==0));
-                        forceMatrix[2*i+j].push((i==k)*(j==1));
-                        break;
-                }
-            }
-        }
-    }
-    return forceMatrix;
-}
-
 //INITIALIZATION
 
 let nodes = [];
@@ -452,7 +543,6 @@ let tempNodes = [];
 tempNodes.setPosition = setPosition;
 
 let tempBeams = [];
-
 
 //MAIN LOOP
 
@@ -475,8 +565,8 @@ function mainLoop(){
     if (movingForce){
         movingForce.setForceFromGizmo(mouse.coords);
     }
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#000000"
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     for (i = 0; i < beams.length; ++i){
         beams[i].draw();
