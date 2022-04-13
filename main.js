@@ -1,3 +1,14 @@
+//CONSTANTS:
+const BG_COLOR = "#0b0b0b"
+const NODE_COLOR = "#d9d8d8"
+const NODE_MOUSED_COLOR = "#ffd204"
+const FORCE_COLOR = "#ee2e24"
+const BEAM_COLOR = "#a8a19f"
+const BEAM_MOUSED_COLOR = "#ffd204"
+const TENSION_COLOR = "#ee2e24"
+const COMPRESSION_COLOR = "#006bec"
+const GRID_COLOR = "#231f20"
+
 //CANVAS SETUP
 
 const canvas = document.getElementById('mainCanvas');
@@ -34,6 +45,7 @@ canvas.addEventListener('wheel', function(event){
 })
 
 canvas.addEventListener('keydown', function(event){
+    solution.isValid = false;
     let pressedNode = nodes.getAtCoords(mouse.coords);
     if (event.code[0] == "K"){ //if key pressed has code beginning with K,therefore Key
         event.preventDefault();
@@ -75,10 +87,6 @@ canvas.addEventListener('keydown', function(event){
         case "KeyF": //Edit force
             movingForce = nodes.getForcesAtCoords(mouse.coords);
             break;
-        
-        case "Enter":
-            solution = new Solution()
-            break;
     }
 })
 
@@ -105,6 +113,7 @@ canvas.addEventListener('keyup', function(event){
 
 
 canvas.onmousedown = function(){ //TODO: package node creation as its own function.
+    solution.isValid = 0;
     newNode = new node(viewPort.pixelsToUnits(mouse.coords), tempNodes);
     tempNodes.push(newNode);
     extrudeFrom = nodes.getAtCoords(mouse.coords);
@@ -186,10 +195,10 @@ class node{
         ctx.beginPath();
         ctx.arc(drawCoords[0], drawCoords[1], 10, 0, 2*Math.PI);
         if (this.isTouchingPoint(mouse.coords)){
-            ctx.fillStyle = "#0000ff";
+            ctx.fillStyle = NODE_MOUSED_COLOR;
         }
         else{
-            ctx.fillStyle = "#ffffff";
+            ctx.fillStyle = NODE_COLOR;
         }
         ctx.fill();
 
@@ -220,7 +229,7 @@ class node{
             ctx.moveTo(drawCoords[0], drawCoords[1]);
             ctx.lineTo(gizmoCoords[0], gizmoCoords[1]);
             ctx.lineWidth = 3;
-            ctx.strokeStyle = "#FF0000"
+            ctx.strokeStyle = FORCE_COLOR
             ctx.stroke();
         }
     }
@@ -300,34 +309,24 @@ class beam{
         this.parentArray = parentArray;
     }
 
-    draw(stresses = solution){
+    draw(){
         let startCoords = viewPort.unitsToPixels(this.nodes[0].coords);
         let endCoords = viewPort.unitsToPixels(this.nodes[1].coords);
-        let index = 0;
         ctx.beginPath();
         ctx.moveTo(startCoords[0], startCoords[1]);
         ctx.lineTo(endCoords[0], endCoords[1]);
         ctx.lineWidth = 5;
 
         if (solution.isValid){
-            index = this.parentArray.indexOf(this);
-            if (stresses.array[index]>0){
-                ctx.strokeStyle = "#0000AA"
-            }
-            else if (stresses.array[index]<0){
-                ctx.strokeStyle = "#00AA00"
-            }
-            else{
-                ctx.strokeStyle = "#ffffff"
-            }
+            ctx.strokeStyle = solution.getColor(this.parentArray.indexOf(this));
         }
 
         else if (this.isTouchingPoint(mouse.coords)){
-            ctx.strokeStyle = "#FF0000"
+            ctx.strokeStyle = BEAM_MOUSED_COLOR
         }
         
         else{
-            ctx.strokeStyle = "#ffffff"
+            ctx.strokeStyle = BEAM_COLOR
         }
 
         ctx.stroke();
@@ -427,11 +426,11 @@ class beam{
 
 class Solution{
     constructor(nodeArray = nodes, beamArray = beams){
+        this.isValid = false;
         let i,j,k;
         let beamMatrix = [];
         let forceMatrix = [];
         let toBePushed = 0;
-        console.log(beamMatrix);
         for (i = 0; i < nodeArray.length; ++i){    
             for (j = 0; j<2; ++j){
                 beamMatrix.push([]);
@@ -464,10 +463,38 @@ class Solution{
                 forceMatrix.push([nodeArray[i].force[j]])
             }
         }
-        console.log(beamMatrix);
-        console.log(forceMatrix);
         this.array = (math.multiply(math.inv(beamMatrix),forceMatrix));
+
+        for (i = 0; i < this.array.length ;++i){
+            this.array[i] = this.array[i][0];
+        }
+
+        this.maxLoad = math.max(this.array);
+        this.minLoad = math.min(this.array);
+        
         this.isValid = true;
+    }
+
+    getColor(beamIndex){
+        let baseColour = hexToRGB(BEAM_COLOR);
+        let addedColour;
+        let mix;
+        let result = [];
+        let i = 0;
+        if (this.array[beamIndex]>0){
+            addedColour = hexToRGB(COMPRESSION_COLOR);
+            mix = this.maxLoad;
+        }
+        else{
+            addedColour = hexToRGB(TENSION_COLOR);
+            mix = this.minLoad;
+        }
+
+        mix = this.array[beamIndex]/mix;
+        for (i = 0; i<3; ++i){
+            result.push(addedColour[i]*mix+baseColour[i]*(1-mix));
+        }
+        return RGBToHex(result);
     }
 }
 
@@ -499,10 +526,74 @@ viewPort = {
         newcoords[1] /= this.zoom;
 
         return newcoords;
+   },
+
+   drawGrid : function(){
+       let i, j;
+       let gridStart = this.pixelsToUnits([0,0]);
+       let gridEnd = this.pixelsToUnits([canvas.width, canvas.height]);
+       gridStart = [Math.floor(gridStart[0]), Math.floor(gridStart[1])];
+       gridEnd = [Math.ceil(gridEnd[0]), Math.ceil(gridEnd[1])];
+       
+       let lineStart = [0,0];
+
+       for (i = gridStart[0], j = 0; i<gridEnd[0]; i+=0.2, ++j){
+        ctx.beginPath();
+        let lineStart = this.unitsToPixels([i, 0]);
+        ctx.moveTo(lineStart[0] ,0);
+        ctx.lineTo(lineStart[0], canvas.height);
+        if (j % 5 ==0){
+            ctx.lineWidth = 1;
+        }
+        else{
+            ctx.lineWidth = 0.5;
+        }
+        ctx.strokeStyle = GRID_COLOR;
+        ctx.stroke();
+       }
+
+       for (i = gridStart[1], j = 0; i<gridEnd[1]; i+=0.2, ++j){
+        ctx.beginPath();
+        let lineStart = this.unitsToPixels([0, i]);
+        ctx.moveTo(0, lineStart[1]);
+        ctx.lineTo(canvas.width, lineStart[1]);
+        if (j % 5 ==0){
+            ctx.lineWidth = 1;
+        }
+        else{
+            ctx.lineWidth = 0.5;
+        }
+        ctx.strokeStyle = GRID_COLOR;
+        ctx.stroke();
+       } //TODO: merge those
    }
 }
 
 //FUNCTIONS
+
+function hexToRGB(hexColour){
+    let rgb = [0,0,0]
+    if (hexColour.length == 7){
+        hexColour = hexColour.slice(1,7);
+    }
+    rgb[0] = Number(`0x${hexColour.slice(0,2)}`);
+    rgb[1] = Number(`0x${hexColour.slice(2,4)}`);
+    rgb[2] = Number(`0x${hexColour.slice(4)}`);
+    return rgb;
+}
+
+function RGBToHex(RGBArray){
+    let rgb = "#";
+    let temp = "";
+    for (let i = 0; i < RGBArray.length; ++i){
+        temp = parseInt(RGBArray[i]).toString(16);
+        if (temp.length == 1){
+            rgb += "0";
+        }
+        rgb += temp;
+    }
+    return rgb;
+}
 
 function getAtCoords(coords){
     length = this.length;
@@ -547,6 +638,7 @@ let tempBeams = [];
 //MAIN LOOP
 
 function mainLoop(){
+    let i = 0;
     requestAnimationFrame(mainLoop);
     let mouseDelta = [0,0];
 
@@ -565,13 +657,15 @@ function mainLoop(){
     if (movingForce){
         movingForce.setForceFromGizmo(mouse.coords);
     }
-    ctx.fillStyle = "#000000"
+    ctx.fillStyle = BG_COLOR
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    viewPort.drawGrid();
 
     for (i = 0; i < beams.length; ++i){
         beams[i].draw();
     }
-    for (let i = 0; i < nodes.length; ++i){ //TODO: draw function.
+    for (i = 0; i < nodes.length; ++i){ //TODO: draw function.
         nodes[i].draw();
     }
     for (i = 0; i < tempBeams.length; ++i){
