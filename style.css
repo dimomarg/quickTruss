@@ -2,4 +2,34 @@ body{
     margin: 0;
     padding: 0;
     overflow: hidden;
+    position: relative;
+}
+
+h4{
+    
+    margin: 0 0 1em 0;
+}
+
+th{
+    padding-right: 0.7em;
+}
+div{
+    position:fixed;
+    color:#d9d8d8;
+    font-family: Courier New, monospace;
+    font-size: 1.1em;
+    background-color: #0a0b0b;
+    border-color: #231f20;
+    border-style: solid;
+    border-width: 2px;
+    margin: 0.5em;
+    padding: 1em;
+}
+.instructions{
+    left:0;
+    bottom:0;   
+}
+.tooltip{
+    right:0;
+    bottom:0;
 }

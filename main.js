@@ -1,10 +1,10 @@
-//CONSTANTS:
+//CONSTANTS
 const BG_COLOR = "#0b0b0b"
 const NODE_COLOR = "#d9d8d8"
 const NODE_MOUSED_COLOR = "#ffd204"
 const FORCE_COLOR = "#ee2e24"
 const BEAM_COLOR = "#a8a19f"
-const BEAM_MOUSED_COLOR = "#ffd204"
+const BEAM_MOUSED_COLOR = NODE_MOUSED_COLOR
 const TENSION_COLOR = "#ee2e24"
 const COMPRESSION_COLOR = "#006bec"
 const GRID_COLOR = "#231f20"
@@ -15,6 +15,7 @@ const canvas = document.getElementById('mainCanvas');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
 
 let supportX;
 let supportY;
@@ -41,7 +42,7 @@ canvas.addEventListener('mousemove', function(event){
 
 canvas.addEventListener('wheel', function(event){
     event.preventDefault();
-    viewPort.zoom += event.deltaY/10;
+    viewPort.zoom -= event.deltaY/10;
 })
 
 canvas.addEventListener('keydown', function(event){
@@ -316,20 +317,26 @@ class beam{
         ctx.moveTo(startCoords[0], startCoords[1]);
         ctx.lineTo(endCoords[0], endCoords[1]);
         ctx.lineWidth = 5;
+        let mouseOver = this.isTouchingPoint(mouse.coords)
 
         if (solution.isValid){
             ctx.strokeStyle = solution.getColor(this.parentArray.indexOf(this));
         }
 
-        else if (this.isTouchingPoint(mouse.coords)){
-            ctx.strokeStyle = BEAM_MOUSED_COLOR
+        else if (mouseOver){
+            ctx.strokeStyle = BEAM_MOUSED_COLOR;
+
         }
         
         else{
-            ctx.strokeStyle = BEAM_COLOR
+            ctx.strokeStyle = BEAM_COLOR;
         }
 
         ctx.stroke();
+
+        if (mouseOver && solution.isValid){
+            tooltip.innerText = `Load: ${solution.getLoad(this.parentArray.indexOf(this)).toFixed(3)}`;
+        }
     }
 
     isTouchingPoint(c){ //caution: returns infinity if point is closest to end points
@@ -422,6 +429,11 @@ class beam{
         let vector = this.getVector(node);
         return vector [0]/Math.sqrt(vector[0]*vector[0]+vector[1]*vector[1]);
     }
+    
+    tooltip(){
+        console.log("tooltip");
+        return "tooltip" //this.parentArray.indexOf(this);
+    }
 }
 
 class Solution{
@@ -495,6 +507,10 @@ class Solution{
             result.push(addedColour[i]*mix+baseColour[i]*(1-mix));
         }
         return RGBToHex(result);
+    }
+
+    getLoad(beamIndex){
+        return -this.array[beamIndex]*solution.isValid;
     }
 }
 
