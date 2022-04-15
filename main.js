@@ -300,6 +300,9 @@ class node{
             }
         }
     }
+    tooltip(){
+
+    }
 }
 
 class beam{
@@ -335,7 +338,7 @@ class beam{
         ctx.stroke();
 
         if (mouseOver && solution.isValid){
-            tooltip.innerText = `Load: ${solution.getLoad(this.parentArray.indexOf(this)).toFixed(3)}`;
+            tooltip.innerText = this.tooltip();
         }
     }
 
@@ -431,8 +434,7 @@ class beam{
     }
     
     tooltip(){
-        console.log("tooltip");
-        return "tooltip" //this.parentArray.indexOf(this);
+        return `Load: ${solution.getLoad(this.parentArray.indexOf(this)).toFixed(3)}`
     }
 }
 
