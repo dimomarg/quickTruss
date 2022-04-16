@@ -3,6 +3,8 @@ body{
     padding: 0;
     overflow: hidden;
     position: relative;
+    background-color: #0a0b0b;
+    color:#d9d8d8;
 }
 
 h4{
@@ -15,8 +17,7 @@ th{
 }
 div{
     position:fixed;
-    color:#d9d8d8;
-    font-family: Courier New, monospace;
+    font-family: "Courier New", monospace;
     font-size: 1.1em;
     background-color: #0a0b0b;
     border-color: #231f20;
