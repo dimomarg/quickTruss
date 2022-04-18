@@ -1,13 +1,13 @@
 //CONSTANTS
-const BG_COLOR = "#0b0b0b"
-const NODE_COLOR = "#d9d8d8"
-const NODE_MOUSED_COLOR = "#ffd204"
-const FORCE_COLOR = "#ee2e24"
-const BEAM_COLOR = "#a8a19f"
-const BEAM_MOUSED_COLOR = NODE_MOUSED_COLOR
-const TENSION_COLOR = "#ee2e24"
-const COMPRESSION_COLOR = "#006bec"
-const GRID_COLOR = "#231f20"
+const BG_COLOR = "#0b0b0b";
+const NODE_COLOR = "#d9d8d8";
+const NODE_MOUSED_COLOR = "#ffd204";
+const FORCE_COLOR = "#ee2e24";
+const BEAM_COLOR = "#a8a19f";
+const BEAM_MOUSED_COLOR = NODE_MOUSED_COLOR;
+const TENSION_COLOR = "#ee2e24";
+const COMPRESSION_COLOR = "#006bec";
+const GRID_COLOR = "#231f20";
 
 //CANVAS SETUP
 
@@ -47,7 +47,7 @@ canvas.addEventListener('wheel', function(event){
 
 canvas.addEventListener('keydown', function(event){
     solution.isValid = false;
-    let pressedNode = nodes.getAtCoords(mouse.coords);
+    let pressedNode = mouse.hoveredNodes[0];
     if (event.code[0] == "K"){ //if key pressed has code beginning with K,therefore Key
         event.preventDefault();
     }
@@ -62,7 +62,7 @@ canvas.addEventListener('keydown', function(event){
             if (pressedNode){
                 pressedNode.delete();
             }
-            else if (pressedNode = beams.getAtCoords(mouse.coords)){
+            else if (pressedNode = mouse.hoveredBeams[0]){
                 pressedNode.delete();
             }
             break;
@@ -117,12 +117,12 @@ canvas.onmousedown = function(){ //TODO: package node creation as its own functi
     solution.isValid = 0;
     newNode = new node(viewPort.pixelsToUnits(mouse.coords), tempNodes);
     tempNodes.push(newNode);
-    extrudeFrom = nodes.getAtCoords(mouse.coords);
+    extrudeFrom = mouse.hoveredNodes[0];
 
     if (extrudeFrom){
         tempBeams.push(new beam([newNode, extrudeFrom], tempBeams));
     }
-    else if (extrudeFrom = beams.getAtCoords(mouse.coords)){
+    else if (extrudeFrom = mouse.hoveredBeams[0]){
         tempBeams.push(new beam([newNode, extrudeFrom.nodes[0]],tempBeams));
         tempBeams.push(new beam([newNode, extrudeFrom.nodes[1]],tempBeams));
     }
@@ -133,7 +133,7 @@ canvas.onmouseup = function(){
     let mergeNode;
     movingNodes = false;
     while (tempNodes.length > 0){
-        if (mergeNode = nodes.getAtCoords(mouse.coords)){
+        if (mergeNode = mouse.hoveredNodes[0]){
             tempNodes[0].transferBeamsTo(mergeNode);
             tempNodes.splice(0,1);
         }
@@ -154,11 +154,20 @@ mouse = { //mouse handler object
     coords : [0,0],
     prevCoords : [0,0],
     hasMoved : false,
-
-    update : function(event){
+    hoveredNodes : [],
+    hoveredBeams : [],
+    update : function(event){ // called by mousemove
         this.prevCoords = [this.coords[0], this.coords[1]];
         this.coords = [event.x, event.y];
         this.hasMoved = true;
+
+        this.hoveredNodes = [];
+        this.hoveredBeams = [];
+
+        this.hoveredNodes.push(nodes.getAtCoords(this.coords));
+        this.hoveredBeams.push(beams.getAtCoords(this.coords));
+        this.hoveredNodes.push(tempNodes.getAtCoords(this.coords));
+        this.hoveredBeams.push(tempBeams.getAtCoords(this.coords));
     },
 
     getDelta : function(){
@@ -195,7 +204,7 @@ class node{
         let drawCoords = viewPort.unitsToPixels(this.coords);
         ctx.beginPath();
         ctx.arc(drawCoords[0], drawCoords[1], 10, 0, 2*Math.PI);
-        if (this.isTouchingPoint(mouse.coords)){
+        if (mouse.hoveredNodes.indexOf(this) >= 0){
             ctx.fillStyle = NODE_MOUSED_COLOR;
         }
         else{
@@ -320,7 +329,7 @@ class beam{
         ctx.moveTo(startCoords[0], startCoords[1]);
         ctx.lineTo(endCoords[0], endCoords[1]);
         ctx.lineWidth = 5;
-        let mouseOver = this.isTouchingPoint(mouse.coords)
+        let mouseOver = mouse.hoveredBeams.indexOf(this) >= 0;
 
         if (solution.isValid){
             ctx.strokeStyle = solution.getColor(this.parentArray.indexOf(this));
@@ -650,8 +659,11 @@ beams.getAtCoords = getAtCoords;
 
 let tempNodes = [];
 tempNodes.setPosition = setPosition;
+tempNodes.getAtCoords = getAtCoords;
+
 
 let tempBeams = [];
+tempBeams.getAtCoords = getAtCoords;
 
 //MAIN LOOP
 
