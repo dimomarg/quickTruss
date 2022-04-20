@@ -27,6 +27,7 @@ window.onload = function(){
 }
 
 let scrolling = false;
+let snapping = false;
 let movingNodes = false;
 let movingForce = false;
 
@@ -55,6 +56,10 @@ canvas.addEventListener('keydown', function(event){
 
         case "Space": //Scroll
             scrolling = true;
+            break;
+        case "ShiftLeft":
+        case "ShiftRight":
+            snapping = true;
             break;
         case "Delete": //Delete node
         case "Backspace":
@@ -96,7 +101,10 @@ canvas.addEventListener('keyup', function(event){
         case "Space":
             scrolling = false;
             break;
-        
+        case "ShiftLeft":
+        case "ShiftRight":
+            snapping = false;
+            break;
         case "KeyM":
             while (tempNodes.length > 0){
                 tempNodes[0].changeParent(nodes);
@@ -556,43 +564,54 @@ viewPort = {
    },
 
    drawGrid : function(){
-       let i, j;
-       let gridStart = this.pixelsToUnits([0,0]);
-       let gridEnd = this.pixelsToUnits([canvas.width, canvas.height]);
-       gridStart = [Math.floor(gridStart[0]), Math.floor(gridStart[1])];
-       gridEnd = [Math.ceil(gridEnd[0]), Math.ceil(gridEnd[1])];
+        let i, j;
+        let gridStart = this.pixelsToUnits([0,0]);
+        let gridEnd = this.pixelsToUnits([canvas.width, canvas.height]);
+        gridStart = [Math.floor(gridStart[0]), Math.floor(gridStart[1])];
+        gridEnd = [Math.ceil(gridEnd[0]), Math.ceil(gridEnd[1])];
        
-       let lineStart = [0,0];
+        let lineStart = [0,0];
 
-       for (i = gridStart[0], j = 0; i<gridEnd[0]; i+=0.2, ++j){
-        ctx.beginPath();
-        let lineStart = this.unitsToPixels([i, 0]);
-        ctx.moveTo(lineStart[0] ,0);
-        ctx.lineTo(lineStart[0], canvas.height);
-        if (j % 5 ==0){
-            ctx.lineWidth = 1;
+        for (i = gridStart[0], j = 0; i<gridEnd[0]; i+=0.2, ++j){
+            ctx.beginPath();
+            let lineStart = this.unitsToPixels([i, 0]);
+            ctx.moveTo(lineStart[0] ,0);
+            ctx.lineTo(lineStart[0], canvas.height);
+            if (math.abs(i) < 0.1){
+            ctx.lineWidth = 3;
+            }
+            else if (j % 5 ==0){
+                ctx.lineWidth = 1;
+            }
+            else{
+                ctx.lineWidth = 0.5;
+            }
+            ctx.strokeStyle = GRID_COLOR;
+            ctx.stroke();
         }
-        else{
-            ctx.lineWidth = 0.5;
-        }
-        ctx.strokeStyle = GRID_COLOR;
-        ctx.stroke();
-       }
 
-       for (i = gridStart[1], j = 0; i<gridEnd[1]; i+=0.2, ++j){
-        ctx.beginPath();
-        let lineStart = this.unitsToPixels([0, i]);
-        ctx.moveTo(0, lineStart[1]);
-        ctx.lineTo(canvas.width, lineStart[1]);
-        if (j % 5 ==0){
-            ctx.lineWidth = 1;
-        }
-        else{
-            ctx.lineWidth = 0.5;
-        }
-        ctx.strokeStyle = GRID_COLOR;
-        ctx.stroke();
-       } //TODO: merge those
+        for (i = gridStart[1], j = 0; i<gridEnd[1]; i+=0.2, ++j){
+            ctx.beginPath();
+            let lineStart = this.unitsToPixels([0, i]);
+            ctx.moveTo(0, lineStart[1]);
+            ctx.lineTo(canvas.width, lineStart[1]);
+            if (math.abs(i) < 0.1){
+                ctx.lineWidth = 3;
+            }
+            else if (j % 5 ==0){
+                ctx.lineWidth = 1;
+            }
+            else{
+                ctx.lineWidth = 0.5;
+            }
+            ctx.strokeStyle = GRID_COLOR;
+            ctx.stroke();
+        }     //TODO: merge those
+   },
+
+   snap : function(coords, increment = 0.2){
+        return [Math.round(coords[0]/increment)*increment,
+            Math.round(coords[1]/increment)*increment];
    }
 }
 
@@ -670,9 +689,7 @@ tempBeams.getAtCoords = getAtCoords;
 function mainLoop(){
     let i = 0;
     requestAnimationFrame(mainLoop);
-    let mouseDelta = [0,0];
-
-    mouseDelta = mouse.getDelta();
+    let mouseDelta = mouse.getDelta();
 
     if (scrolling){
         viewPort.pan[0] -= mouseDelta[0];
@@ -681,7 +698,12 @@ function mainLoop(){
     }
 
     if (movingNodes){
-        tempNodes.setPosition(viewPort.pixelsToUnits(mouse.coords))
+        tempNodes.setPosition(viewPort.pixelsToUnits(mouse.coords));
+        if (snapping){
+            for(i = 0; i< tempNodes.length; ++i){
+                tempNodes[i].coords = viewPort.snap(tempNodes[i].coords);
+            }
+        }
     }
 
     if (movingForce){
