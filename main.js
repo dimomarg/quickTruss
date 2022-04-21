@@ -91,7 +91,7 @@ canvas.addEventListener('keydown', function(event){
             break;
         
         case "KeyF": //Edit force
-            movingForce = nodes.getForcesAtCoords(mouse.coords);
+            movingForce = mouse.hoveredForce;
             break;
     }
 })
@@ -116,6 +116,7 @@ canvas.addEventListener('keyup', function(event){
             movingForce = false;
             break;
     }
+    mouse.update();
     solution = new Solution();
 
 })
@@ -152,8 +153,8 @@ canvas.onmouseup = function(){
     while (tempBeams.length > 0){
         tempBeams[0].changeParent(beams);
     }
+    mouse.update();
     solution = new Solution();
-
 }
 
 //CLASSES
@@ -164,11 +165,15 @@ mouse = { //mouse handler object
     hasMoved : false,
     hoveredNodes : [],
     hoveredBeams : [],
-    update : function(event){ // called by mousemove
+    hoveredForce : false,
+    update : function(event = false){ // called by mousemove
         this.prevCoords = [this.coords[0], this.coords[1]];
-        this.coords = [event.x, event.y];
-        this.hasMoved = true;
-
+        
+        if (event){
+            this.coords = [event.x, event.y];
+            this.hasMoved = true;
+        }
+        
         this.hoveredNodes = [];
         this.hoveredBeams = [];
 
@@ -176,6 +181,7 @@ mouse = { //mouse handler object
         this.hoveredBeams.push(beams.getAtCoords(this.coords));
         this.hoveredNodes.push(tempNodes.getAtCoords(this.coords));
         this.hoveredBeams.push(tempBeams.getAtCoords(this.coords));
+        this.hoveredForce = nodes.getForcesAtCoords(this.coords);
     },
 
     getDelta : function(){
